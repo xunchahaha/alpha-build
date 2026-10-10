@@ -25,7 +25,7 @@ jobs:
         with:
           repository: xunchahaha/alpha
           ref: ${{ inputs.ref }}
-          token: ${{ secrets.ALPHA_PRIVATE_PULL }}
+          token: ${{ secrets.ALPHA_SHELL_TOKEN }}
           persist-credentials: false
 
       - name: Verify private component releases are reachable
