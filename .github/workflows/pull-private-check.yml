@@ -1,0 +1,65 @@
+name: pull-private-check
+
+# 首轮验证：公开仓能否用 ALPHA_PRIVATE_PULL 拉到三个私有仓的 release。
+# 只做 gh release list + 锁 commit 存在性检查，不 checkout 私有源码、
+# 不编译、不下载大资产。跑通即证明免费额度链路可用。
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "alpha 壳版本（tag 或分支，默认 main）"
+        required: false
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout alpha public shell (read-only, public)
+        uses: actions/checkout@v4
+        with:
+          repository: xunchahaha/alpha
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Verify private component releases are reachable
+        env:
+          GH_TOKEN: ${{ secrets.ALPHA_PRIVATE_PULL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for repo in xunchahaha/alpha-wcdb xunchahaha/alpha-xkey xunchahaha/alpha-wxproto; do
+            echo "=== $repo ==="
+            gh release list -R "$repo" --limit 5 || echo "::warning::$repo has no releases yet (expected before first publish)"
+          done
+
+      - name: Verify locked commits exist in private repos
+        env:
+          GH_TOKEN: ${{ secrets.ALPHA_PRIVATE_PULL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess
+          lock = json.load(open('components/alpha-components.json'))
+          for comp, info in lock['components'].items():
+              if comp == 'faka':
+                  continue
+              repo = info['repository']
+              commit = info['commit']
+              r = subprocess.run(
+                  ['gh', 'api', f'repos/{repo}/commits/{commit}', '--jq', '.sha'],
+                  capture_output=True, text=True)
+              if r.returncode != 0 or r.stdout.strip() != commit:
+                  raise SystemExit(f'locked commit unreachable: {repo}@{commit}\n{r.stderr.strip()}')
+              print(f'locked commit OK: {repo}@{commit}')
+          PY
+
+      - name: Check public boundary guard still passes
+        shell: bash
+        run: node tools/check-open-shell-boundary.mjs
