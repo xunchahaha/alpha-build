@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for repo in xunchahaha12/alpha-wcdb xunchahaha12/alpha-xkey xunchahaha12/alpha-wxproto; do
+          for repo in xunchahaha/alpha-wcdb xunchahaha/alpha-xkey xunchahaha/alpha-wxproto; do
             echo "=== $repo ==="
             gh release list -R "$repo" --limit 5 || echo "::warning::$repo has no releases yet (expected before first publish)"
           done
